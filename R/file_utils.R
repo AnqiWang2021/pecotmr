@@ -642,7 +642,7 @@ clean_context_names <- function(context, gene) {
 load_twas_weights <- function(weight_db_files, conditions = NULL,
                               variable_name_obj = c("preset_variants_result", "variant_names"),
                               susie_obj = c("preset_variants_result", "susie_result_trimmed"),
-                              twas_weights_table = "twas_weights") {
+                              twas_weights_table = "twas_weights") {  
   ## Internal function to load and validate data from RDS files
   load_and_validate_data <- function(weight_db_files, conditions, variable_name_obj) {
     all_data <- do.call(c, lapply(unname(weight_db_files), function(rds_file) {
@@ -664,6 +664,9 @@ load_twas_weights <- function(weight_db_files, conditions = NULL,
           
           db[[gene]] <- db[[gene]][matching_contexts]
         }
+      } else {
+        # Set default for 'conditions' if they are not specified
+        conditions <- names(db[[gene]])
       }
       if (any(unique(names(find_data(db, c(3, "twas_weights")))) %in% c("mrmash_weights", "mvsusie_weights"))) {
         names(db[[1]]) <- clean_context_names(names(db[[1]]), gene = gene)
@@ -722,10 +725,6 @@ load_twas_weights <- function(weight_db_files, conditions = NULL,
     if (gene %in% names(combined_all_data)) combined_all_data <- do.call(c, unname(combined_all_data))
     if (gene %in% names(combined_all_data)) combined_all_data <- combined_all_data[[1]]
 
-    # Set default for 'conditions' if they are not specified
-    if (is.null(conditions)) {
-      conditions <- names(combined_all_data)
-    }
     # ## Check if the specified condition and variable_name_obj are available in all files
     # if (!all(conditions %in% names(combined_all_data))) {
     #   stop("The specified condition is not available in all RDS files.")

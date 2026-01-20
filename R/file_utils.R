@@ -642,12 +642,32 @@ clean_context_names <- function(context, gene) {
 load_twas_weights <- function(weight_db_files, conditions = NULL,
                               variable_name_obj = c("preset_variants_result", "variant_names"),
                               susie_obj = c("preset_variants_result", "susie_result_trimmed"),
-                              twas_weights_table = "twas_weights") {
+                              twas_weights_table = "twas_weights") {  
   ## Internal function to load and validate data from RDS files
   load_and_validate_data <- function(weight_db_files, conditions, variable_name_obj) {
     all_data <- do.call(c, lapply(unname(weight_db_files), function(rds_file) {
       db <- readRDS(rds_file)
       gene <- names(db)
+      # Filter by conditions if specified
+      if (!is.null(conditions)) {
+        # Split contexts if specified and trim whitespace, cen handle single or multiple conditions
+        conditions <- trimws(strsplit(conditions, ",")[[1]])
+
+        # Filter the gene's data to only include specified context layers
+        if (length(gene) == 1 && gene != "mnm_rs") { # Need check
+          available_contexts <- names(db[[gene]])
+          matching_contexts <- available_contexts[available_contexts %in% paste0(conditions, "_", gene)]
+          if (length(matching_contexts) == 0) {
+            warning(paste0("No matching context layers found in ", rds_file, ". Skipping this file."))
+            return(NULL)
+          }
+          
+          db[[gene]] <- db[[gene]][matching_contexts]
+        }
+      } else {
+        # Set default for 'conditions' if they are not specified
+        conditions <- names(db[[gene]])
+      }
       if (any(unique(names(find_data(db, c(3, "twas_weights")))) %in% c("mrmash_weights", "mvsusie_weights"))) {
         names(db[[1]]) <- clean_context_names(names(db[[1]]), gene = gene)
         db <- list(mnm_rs = db[[1]])
@@ -661,7 +681,12 @@ load_twas_weights <- function(weight_db_files, conditions = NULL,
       }
       return(db)
     }))
+    # Remove NULL entries (from files that had no matching context layers)
+    all_data <- all_data[!sapply(all_data, is.null)]
 
+    if (length(all_data) == 0) {
+      stop("No data loaded. Check that conditions match available context layers in the RDS files.")
+    }
     # Combine the lists with the same region name
     gene <- unique(names(all_data)[!names(all_data) %in% "mnm_rs"])
     if (length(gene) > 1) stop("More than one region of twas weights data provided. ")
@@ -700,14 +725,10 @@ load_twas_weights <- function(weight_db_files, conditions = NULL,
     if (gene %in% names(combined_all_data)) combined_all_data <- do.call(c, unname(combined_all_data))
     if (gene %in% names(combined_all_data)) combined_all_data <- combined_all_data[[1]]
 
-    # Set default for 'conditions' if they are not specified
-    if (is.null(conditions)) {
-      conditions <- names(combined_all_data)
-    }
-    ## Check if the specified condition and variable_name_obj are available in all files
-    if (!all(conditions %in% names(combined_all_data))) {
-      stop("The specified condition is not available in all RDS files.")
-    }
+    # ## Check if the specified condition and variable_name_obj are available in all files
+    # if (!all(conditions %in% names(combined_all_data))) {
+    #   stop("The specified condition is not available in all RDS files.")
+    # }
     return(combined_all_data)
   }
 
@@ -770,7 +791,7 @@ load_twas_weights <- function(weight_db_files, conditions = NULL,
       names(performance_tables) <- conditions
       return(list(susie_results = combined_susie_result, weights = weights, twas_cv_performance = performance_tables))
     },
-    silent = TRUE
+    silent = FALSE
   )
 }
 

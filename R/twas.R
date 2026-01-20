@@ -269,6 +269,15 @@ harmonize_gwas <- function(gwas_file, query_region, ld_variants, col_to_flip=NUL
         return(NULL)
     }
     if (colnames(gwas_data_sumstats)[1] == "#chrom") colnames(gwas_data_sumstats)[1] <- "chrom" # colname update for tabix
+    
+    # Check if sumstats has z-scores or (beta and se)  
+    if (!is.null(gwas_data_sumstats$z)) {  
+      gwas_data_sumstats$z <- gwas_data_sumstats$z  
+    } else if (!is.null(gwas_data_sumstats$beta) && !is.null(gwas_data_sumstats$se)) {  
+      gwas_data_sumstats$z <- gwas_data_sumstats$beta / gwas_data_sumstats$se  
+    } else {  
+      stop("gwas_data_sumstats should have 'z' or ('beta' and 'se') columns")  
+    }
     # check for overlapping variants
     if (!any(gwas_data_sumstats$pos %in% gsub("\\:.*$", "", sub("^.*?\\:", "", ld_variants)))) return(NULL)
     gwas_allele_flip <- allele_qc(gwas_data_sumstats, ld_variants, col_to_flip=col_to_flip, match_min_prop = match_min_prop)
